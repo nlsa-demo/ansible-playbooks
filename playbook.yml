@@ -61,6 +61,10 @@
         server_session_secret: "{{ lookup('password', '/dev/null length=60 chars=ascii_letters') }}"
         app_api_key: "{{ lookup('password', '/dev/null length=80 chars=ascii_letters') }}"
 
+    - name: install tar
+      apt:
+        name: tar
+
     - name: Get ibmcloud cli tarball
       get_url:
         url: "https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.7.0/IBM_Cloud_CLI_2.7.0_amd64.tar.gz"

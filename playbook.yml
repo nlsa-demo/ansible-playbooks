@@ -64,17 +64,19 @@
     - name: Get ibmcloud cli tarball
       get_url:
         url: "https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.7.0/IBM_Cloud_CLI_2.7.0_amd64.tar.gz"
-        dest: ./IBM_Cloud_CLI_2.7.0_amd64.tar.gz
+        dest: /tmp/IBM_Cloud_CLI_2.7.0_amd64.tar.gz
         mode: 0755
 
     - name: Untar ibmcloud cli tarball
       unarchive:
-        src: ./IBM_Cloud_CLI_2.7.0_amd64.tar.gz
-        dest: .
+        src: /tmp/IBM_Cloud_CLI_2.7.0_amd64.tar.gz
+        dest: /tmp
         remote_src: yes
+        extra_opts:
+          - "-z"
 
     - name: install ibmcloud cli using provided script
-      command: ./Bluemix_CLI/install_bluemix_cli
+      command: /tmp/Bluemix_CLI/install_bluemix_cli
 
     - name: login
       command: ibmcloud login -a https://cloud.ibm.com --apikey {{apikey | mandatory }} -r {{region}}

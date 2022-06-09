@@ -1,0 +1,181 @@
+---
+- hosts: all
+
+  vars:
+    region: eu-de
+    resource_group: Search Asset
+
+    install_code_engine: false
+
+    discovery_name: nlsa-demo
+    discovery_plan: lite
+    discovery_create: false
+
+    app_id_name: nlsa-app-id
+    app_id_plan: graduated-tier
+    app_id_create: false
+
+    log_dna_name: nlsa-logdna
+    log_dna_plan: lite
+    log_dna_create: false
+
+    sysdig_name: nlsa-sysdig
+    sysdig_plan: lite
+    sysdig_create: false
+
+    cos_name: nlsa-cos
+    cos_plan: standard
+    cos_create: false
+
+    mongodb_name: nlsa-mongodb
+    mongodb_plan: standard
+    mongodb_create: false
+    mongodb_nlsa_name: natural-language-search-accelerator
+
+    registry_secret_name: nlsa-registry-secret
+    registry_api_key: our-api-key
+    apikey: your-api-key
+
+    nlsa_be_app_name: nlsa-backend
+    nlsa_be_image: de.icr.io/team-assets/nlsa-v2-prod-backend:2-master-6abdca28-20220225144428
+
+    nlsa_fe_app_name: nlsa-frontend
+    nlsa_fe_image: de.icr.io/team-assets/nlsa-v2-prod-frontend:2-20220225152550
+
+    nlsa_prestart_job_name: nlsa-pre-start-job
+    nlsa_prestart_image: de.icr.io/team-assets/nlsa-pre-start:latest
+
+    ce_project_name: nlsa
+    ce_create: false
+
+    ce_be_config_name: backend-config
+    ce_be_config_file: backend-config.env
+    ce_be_port: 9000
+
+    ce_fe_config_name: frontend-config
+    ce_fe_config_file: frontend-config.env
+    ce_fe_port: 8000
+
+  tasks:
+    - set_fact:
+        server_session_secret: "{{ lookup('password', '/dev/null length=60 chars=ascii_letters') }}"
+        app_api_key: "{{ lookup('password', '/dev/null length=80 chars=ascii_letters') }}"
+
+    - debug:
+        msg: "{{ server_session_secret }}"
+
+    - debug:
+        msg: "{{ app_api_key }}"
+
+    - name: login
+      command: ibmcloud login -a https://cloud.ibm.com --apikey {{apikey | mandatory }} -r {{region}}
+
+    - name: install code engine
+      command: ibmcloud plugin install code-engine
+      when: install_code_engine
+
+    - name: set target resource group
+      command: ibmcloud target -g '{{ resource_group }}'
+
+    # Watson Services
+
+    - name: create Watson Discovery instance
+      command: ibmcloud resource service-instance-create {{ discovery_name }} discovery {{ discovery_plan }} {{ region }}
+      when: discovery_create
+
+    # Other SaaS
+
+    ## AppID
+    - name: create AppId instance
+      command: ibmcloud resource service-instance-create {{ app_id_name }} appid {{ app_id_plan }} {{ region }}
+      when: app_id_create
+
+    ## LogDNA
+    - name: create LogDNA instance
+      command: ibmcloud resource service-instance-create {{ log_dna_name }} logdna {{ log_dna_plan }} {{ region }}
+      when: log_dna_create
+
+    - name: create LogDNA service key
+      command: ibmcloud resource service-key-create {{ log_dna_name }}-key Manager --instance-name {{ log_dna_name }}
+      when: log_dna_create
+
+    ## SysDig
+    - name: create Sysdig instance
+      command: ibmcloud resource service-instance-create {{ sysdig_name }} sysdig-monitor {{ sysdig_plan }} {{ region }} -p '{"default_receiver" {{ ":" }} false}'
+      when: sysdig_create
+
+    - name: create sysdig service key
+      command: ibmcloud resource service-key-create {{ sysdig_name }}-key Writer --instance-name {{ sysdig_name }}
+      when: sysdig_create
+
+    ## Cloud Object Storage
+    - name: create cloud object storage instance
+      command: ibmcloud resource service-instance-create {{ cos_name }} cloud-object-storage {{ cos_plan }} global -g '{{ resource_group }}'
+      when: cos_create
+
+    ## MongoDB
+    - name: create mongodb instance
+      command: ibmcloud resource service-instance-create {{ mongodb_name }} databases-for-mongodb {{ mongodb_plan }}  {{ region }}
+      when: mongodb_create
+
+    # Code Engine
+    - name: create code engine project
+      command: ibmcloud ce project create --name {{ ce_project_name }}
+      when: ce_create
+
+    - name: select code engine project
+      command: ibmcloud ce project select --name {{ ce_project_name }}
+
+    - name: create registry secret
+      command: ibmcloud ce registry create --name {{registry_secret_name}} --server de.icr.io --username iamapikey --password {{registry_api_key}}
+      when: ce_create
+
+    # Code Engine NLSA-Pre-Start-Job
+    - name: create nlsa-pre-start job
+      command: ibmcloud ce job create --name {{ nlsa_prestart_job_name }} --image {{nlsa_prestart_image}} --registry-secret {{registry_secret_name}} --env API_KEY={{apikey}}
+      when: ce_create
+
+    - name: bind mongodb to ce job
+      command: ibmcloud ce job bind --name {{ nlsa_prestart_job_name}} --service-instance {{mongodb_name}}
+      when: ce_create
+
+    - name: bind mongodb to ce job
+      command: ibmcloud ce job bind --name {{ nlsa_prestart_job_name}} --service-instance {{app_id_name}}
+      when: ce_create
+
+    - name: submti nlsa-pre-start job
+      command: ibmcloud ce jobrun submit --job {{ nlsa_prestart_job_name }}
+      when: ce_create
+
+    # Code Engine NLSA App Config
+    - name: create backend config
+      command: ibmcloud ce configmap create --name {{ce_be_config_name}} --from-env-file {{ ce_be_config_file}}
+      when: ce_create
+
+    - name: create frontend config
+      command: ibmcloud ce configmap create --name {{ce_fe_config_name}} --from-env-file {{ ce_fe_config_file}}
+      when: ce_create
+
+    - name: code engine - app backend
+      command: ibmcloud ce app create --name {{ nlsa_be_app_name }} --image {{nlsa_be_image}} --registry-secret {{registry_secret_name}}  --env-from-configmap {{ce_be_config_name}} --env SERVER_SESSION_SECRET={{ server_session_secret }} --env APP_APIKEY={{ app_api_key }} --port {{ce_be_port}} --min-scale 1 --max-scale 1
+      when: ce_create
+
+    - name: code engine - app frontend
+      command: ibmcloud ce app create --name {{ nlsa_fe_app_name }} --image {{nlsa_fe_image}} --registry-secret {{registry_secret_name}} --env-from-configmap {{ce_fe_config_name}} --env SERVER_SESSION_SECRET={{ server_session_secret }} --env APP_APIKEY={{ app_api_key }} --port {{ce_fe_port}} --min-scale 1 --max-scale 1
+      when: ce_create
+
+    - name: bind mongodb to ce nlsa backend
+      command: ibmcloud ce application bind --name {{ nlsa_be_app_name}} --service-instance {{mongodb_name}}
+      when: ce_create
+
+    - name: bind discovery to ce nlsa backend
+      command: ibmcloud ce application bind --name {{ nlsa_be_app_name}} --service-instance {{discovery_name}}
+      when: ce_create
+
+    - name: bind mongodb to ce nlsa frontend
+      command: ibmcloud ce application bind --name {{ nlsa_be_app_name}} --service-instance {{mongodb_name}}
+      when: ce_create
+
+    - name: bind mongodb to ce nlsa frontend
+      command: ibmcloud ce application bind --name {{ nlsa_be_app_name}} --service-instance {{app_id_name}}
+      when: ce_create

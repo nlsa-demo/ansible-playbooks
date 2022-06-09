@@ -61,14 +61,20 @@
         server_session_secret: "{{ lookup('password', '/dev/null length=60 chars=ascii_letters') }}"
         app_api_key: "{{ lookup('password', '/dev/null length=80 chars=ascii_letters') }}"
 
-    - debug:
-        msg: "{{ server_session_secret }}"
+    - name: Get ibmcloud cli tarball
+      get_url:
+      url: "https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.7.0/IBM_Cloud_CLI_2.7.0_amd64.tar.gz"
+      dest: /root/IBM_Cloud_CLI_2.7.0_amd64.tar.gz
+      mode: 0755
 
-    - debug:
-        msg: "{{ app_api_key }}"
+    - name: Untar ibmcloud cli tarball
+      unarchive:
+        src: /root/IBM_Cloud_CLI_2.7.0_amd64.tar.gz
+        dest: /root/
+        remote_src: yes
 
-    - name: Install ibmcloud
-      shell: "curl -fsSL https://clis.cloud.ibm.com/install/linux | sh"
+    - name: install ibmcloud cli using provided script
+      command: /root/Bluemix_CLI/install_bluemix_cli
 
     - name: login
       command: ibmcloud login -a https://cloud.ibm.com --apikey {{apikey | mandatory }} -r {{region}}

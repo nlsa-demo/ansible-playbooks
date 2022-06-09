@@ -67,6 +67,9 @@
     - debug:
         msg: "{{ app_api_key }}"
 
+    - name: Install ibmcloud
+      shell: "curl -fsSL https://clis.cloud.ibm.com/install/linux | sh"
+
     - name: login
       command: ibmcloud login -a https://cloud.ibm.com --apikey {{apikey | mandatory }} -r {{region}}
 

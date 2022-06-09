@@ -64,12 +64,14 @@
     - name: install tar
       apt:
         name: tar
+      when: mongodb_create
 
     - name: Get ibmcloud cli tarball
       get_url:
         url: "https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.7.0/IBM_Cloud_CLI_2.7.0_amd64.tar.gz"
         dest: /tmp/IBM_Cloud_CLI_2.7.0_amd64.tar.gz
         mode: 0755
+      when: mongodb_create
 
     - name: Untar ibmcloud cli tarball
       unarchive:
@@ -78,19 +80,23 @@
         remote_src: yes
         extra_opts:
           - "-z"
+      when: mongodb_create
 
     - name: install ibmcloud cli using provided script
       command: /tmp/Bluemix_CLI/install_bluemix_cli
+      when: mongodb_create
 
     - name: login
       command: ibmcloud login -a https://cloud.ibm.com --apikey {{apikey | mandatory }} -r {{region}}
+      when: mongodb_create
 
     - name: install code engine
       command: ibmcloud plugin install code-engine
-      when: install_code_engine
+      when: mongodb_create
 
     - name: set target resource group
       command: ibmcloud target -g '{{ resource_group }}'
+      when: mongodb_create
 
     # Watson Services
 

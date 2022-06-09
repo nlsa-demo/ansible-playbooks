@@ -146,6 +146,7 @@
 
     - name: select code engine project
       command: ibmcloud ce project select --name {{ ce_project_name }}
+      when: ce_create
 
     - name: create registry secret
       command: ibmcloud ce registry create --name {{registry_secret_name}} --server de.icr.io --username iamapikey --password {{registry_api_key}}

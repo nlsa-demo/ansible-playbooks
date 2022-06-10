@@ -6,10 +6,10 @@ This repository contains an ansible playbook to automatically the Natural Langua
 Integration as Action in Schematics
 
 #### Create Action
-![action config](/imgs/action-config.png)
+![action creation](/imgs/action-create.png)
 
 #### Configure Action
-![action creation](/imgs/action-create.png)
+![action config](/imgs/action-config.png)
 
 Public Github Link containing ansbile playbook:
 ```https://github.com/nlsa-demo/ansible-playbooks```
